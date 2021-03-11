@@ -27,7 +27,7 @@ import (
 
 const (
 	// tgt related
-	tgtBackingStoreOverlayBD = "overlaybd"
+	tgtBackingStoreOverlaybd = "overlaybd"
 
 	defaultInitiatorAddress = "127.0.0.1"
 	defaultInitiatorPort    = "3260"
@@ -37,23 +37,23 @@ const (
 	defaultRollbackTimeout = 30 * time.Second
 )
 
-// OverlayBDBSConfig is the config of OverlayBD backing store in open-iscsi target.
-type OverlayBDBSConfig struct {
+// OverlaybdBSConfig is the config of overlaybd backing store in open-iscsi target.
+type OverlaybdBSConfig struct {
 	RepoBlobUrl string                   `json:"repoBlobUrl"`
-	Lowers      []OverlayBDBSConfigLower `json:"lowers"`
-	Upper       OverlayBDBSConfigUpper   `json:"upper"`
+	Lowers      []OverlaybdBSConfigLower `json:"lowers"`
+	Upper       OverlaybdBSConfigUpper   `json:"upper"`
 	ResultFile  string                   `json:"resultFile"`
 }
 
-// OverlayBDBSConfigLower
-type OverlayBDBSConfigLower struct {
+// OverlaybdBSConfigLower
+type OverlaybdBSConfigLower struct {
 	File   string `json:"file,omitempty"`
 	Digest string `json:"digest,omitempty"`
 	Size   int64  `json:"size,omitempty"`
 	Dir    string `json:"dir,omitempty"`
 }
 
-type OverlayBDBSConfigUpper struct {
+type OverlaybdBSConfigUpper struct {
 	Index string `json:"index,omitempty"`
 	Data  string `json:"data,omitempty"`
 }
@@ -105,7 +105,7 @@ func (o *snapshotter) attachAndMountBlockDevice(ctx context.Context, snID string
 	out, err := exec.CommandContext(ctx, "tgt-admin", "-e", "-c", targetConfPath).CombinedOutput()
 	if err != nil {
 		// read the init-debug.log for readable
-		debugLogPath := o.tgtOverlayBDInitDebuglogPath(snID)
+		debugLogPath := o.tgtOverlaybdInitDebuglogPath(snID)
 		if data, derr := ioutil.ReadFile(debugLogPath); derr == nil {
 			return errors.Wrapf(err, "failed to create target by tgt-admin: %s, more detail in %s", out, data)
 		}
@@ -214,8 +214,8 @@ func (o *snapshotter) attachAndMountBlockDevice(ctx context.Context, snID string
 	return lastErr
 }
 
-// constructOverlayBDSpec generates the config spec for OverlayBD backing store.
-func (o *snapshotter) constructOverlayBDSpec(ctx context.Context, key string, writable bool) error {
+// constructOverlaybdSpec generates the config spec for Overlaybd backing store.
+func (o *snapshotter) constructOverlaybdSpec(ctx context.Context, key string, writable bool) error {
 	id, info, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get info for snapshot %s", key)
@@ -226,9 +226,9 @@ func (o *snapshotter) constructOverlayBDSpec(ctx context.Context, key string, wr
 		return errors.Wrapf(err, "failed to identify storage of snapshot %s", key)
 	}
 
-	configJSON := OverlayBDBSConfig{
-		Lowers:     []OverlayBDBSConfigLower{},
-		ResultFile: o.tgtOverlayBDInitDebuglogPath(id),
+	configJSON := OverlaybdBSConfig{
+		Lowers:     []OverlaybdBSConfigLower{},
+		ResultFile: o.tgtOverlaybdInitDebuglogPath(id),
 	}
 
 	// load the parent's config and reuse the lowerdir
@@ -246,19 +246,19 @@ func (o *snapshotter) constructOverlayBDSpec(ctx context.Context, key string, wr
 			return errors.Errorf("remote block device is readonly, not support writable")
 		}
 
-		blobSize, err := strconv.Atoi(info.Labels[labelKeyOverlayBDBlobSize])
+		blobSize, err := strconv.Atoi(info.Labels[labelKeyOverlaybdBlobSize])
 		if err != nil {
-			return errors.Wrapf(err, "failed to parse value of label %s of snapshot %s", labelKeyOverlayBDBlobSize, key)
+			return errors.Wrapf(err, "failed to parse value of label %s of snapshot %s", labelKeyOverlaybdBlobSize, key)
 		}
 
-		blobDigest := info.Labels[labelKeyOverlayBDBlobDigest]
+		blobDigest := info.Labels[labelKeyOverlaybdBlobDigest]
 		blobPrefixUrl, err := o.constructImageBlobUrl(info.Labels[labelKeyImageRef])
 		if err != nil {
 			return errors.Wrapf(err, "failed to contruct image blob prefix url for snapshot %s", key)
 		}
 
 		configJSON.RepoBlobUrl = blobPrefixUrl
-		configJSON.Lowers = append(configJSON.Lowers, OverlayBDBSConfigLower{
+		configJSON.Lowers = append(configJSON.Lowers, OverlaybdBSConfigLower{
 			Digest: blobDigest,
 			Size:   int64(blobSize),
 			Dir:    o.upperPath(id),
@@ -269,7 +269,7 @@ func (o *snapshotter) constructOverlayBDSpec(ctx context.Context, key string, wr
 			return errors.Errorf("local block device is readonly, not support writable")
 		}
 
-		configJSON.Lowers = append(configJSON.Lowers, OverlayBDBSConfigLower{
+		configJSON.Lowers = append(configJSON.Lowers, OverlaybdBSConfigLower{
 			Dir: o.upperPath(id),
 		})
 
@@ -282,28 +282,28 @@ func (o *snapshotter) constructOverlayBDSpec(ctx context.Context, key string, wr
 			return err
 		}
 
-		configJSON.Upper = OverlayBDBSConfigUpper{
-			Index: o.tgtOverlayBDWritableIndexPath(id),
-			Data:  o.tgtOverlayBDWritableDataPath(id),
+		configJSON.Upper = OverlaybdBSConfigUpper{
+			Index: o.tgtOverlaybdWritableIndexPath(id),
+			Data:  o.tgtOverlaybdWritableDataPath(id),
 		}
 	}
 	return o.atomicWriteBackingStoreAndTargetConfig(ctx, id, key, configJSON)
 }
 
-// loadBackingStoreConfig loads OverlayBD backing store config.
-func (o *snapshotter) loadBackingStoreConfig(ctx context.Context, snKey string) (*OverlayBDBSConfig, error) {
+// loadBackingStoreConfig loads overlaybd backing store config.
+func (o *snapshotter) loadBackingStoreConfig(ctx context.Context, snKey string) (*OverlaybdBSConfig, error) {
 	id, _, _, err := storage.GetInfo(ctx, snKey)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get info of snapshot %s", snKey)
 	}
 
-	confPath := o.tgtOverlayBDConfPath(id)
+	confPath := o.tgtOverlaybdConfPath(id)
 	data, err := ioutil.ReadFile(confPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read config(path=%s) of snapshot %s", confPath, snKey)
 	}
 
-	var configJSON OverlayBDBSConfig
+	var configJSON OverlaybdBSConfig
 	if err := json.Unmarshal(data, &configJSON); err != nil {
 		return nil, errors.Wrapf(err, "failed to unmarshal data(%s)", string(data))
 	}
@@ -326,15 +326,15 @@ func (o *snapshotter) constructImageBlobUrl(ref string) (string, error) {
 }
 
 // atomicWriteBackingStoreAndTargetConfig
-func (o *snapshotter) atomicWriteBackingStoreAndTargetConfig(ctx context.Context, snID string, snKey string, configJSON OverlayBDBSConfig) error {
+func (o *snapshotter) atomicWriteBackingStoreAndTargetConfig(ctx context.Context, snID string, snKey string, configJSON OverlaybdBSConfig) error {
 	data, err := json.Marshal(configJSON)
 	if err != nil {
 		return errors.Wrapf(err, "failed to marshal %+v configJSON into JSON", configJSON)
 	}
 
-	confPath := o.tgtOverlayBDConfPath(snID)
+	confPath := o.tgtOverlaybdConfPath(snID)
 	if err := continuity.AtomicWriteFile(confPath, data, 0600); err != nil {
-		return errors.Wrapf(err, "failed to commit the OverlayBD config on %s", confPath)
+		return errors.Wrapf(err, "failed to commit the Overlaybd config on %s", confPath)
 	}
 
 	confDataStr := generateTargetConfInXML(o.tgtTargetIqn(snID, snKey), confPath)
@@ -345,12 +345,12 @@ func (o *snapshotter) atomicWriteBackingStoreAndTargetConfig(ctx context.Context
 
 // prepareWritableOverlaybd
 func (o *snapshotter) prepareWritableOverlaybd(ctx context.Context, snID string) error {
-	binpath := filepath.Join(o.config.OverlayBDUtilBinDir, "overlaybd-create")
+	binpath := filepath.Join(o.config.OverlaybdUtilBinDir, "overlaybd-create")
 
 	// TODO(fuweid): 256GB can be configurable?
 	out, err := exec.CommandContext(ctx, binpath,
-		o.tgtOverlayBDWritableDataPath(snID),
-		o.tgtOverlayBDWritableIndexPath(snID), "256").CombinedOutput()
+		o.tgtOverlaybdWritableDataPath(snID),
+		o.tgtOverlaybdWritableIndexPath(snID), "256").CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to prepare writable overlaybd: %s", out)
 	}
@@ -359,12 +359,12 @@ func (o *snapshotter) prepareWritableOverlaybd(ctx context.Context, snID string)
 
 // commitWritableOverlaybd
 func (o *snapshotter) commitWritableOverlaybd(ctx context.Context, snID string) (retErr error) {
-	binpath := filepath.Join(o.config.OverlayBDUtilBinDir, "overlaybd-commit")
+	binpath := filepath.Join(o.config.OverlaybdUtilBinDir, "overlaybd-commit")
 	tmpPath := filepath.Join(o.root, "snapshots", snID, "block", ".commit-before-zfile")
 
 	out, err := exec.CommandContext(ctx, binpath,
-		o.tgtOverlayBDWritableDataPath(snID),
-		o.tgtOverlayBDWritableIndexPath(snID), tmpPath).CombinedOutput()
+		o.tgtOverlaybdWritableDataPath(snID),
+		o.tgtOverlaybdWritableIndexPath(snID), tmpPath).CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to commit writable overlaybd: %s", out)
 	}
@@ -373,7 +373,7 @@ func (o *snapshotter) commitWritableOverlaybd(ctx context.Context, snID string) 
 		os.Remove(tmpPath)
 	}()
 
-	binpath = filepath.Join(o.config.OverlayBDUtilBinDir, "overlaybd-zfile")
+	binpath = filepath.Join(o.config.OverlaybdUtilBinDir, "overlaybd-zfile")
 	out, err = exec.CommandContext(ctx, binpath, tmpPath, o.magicFilePath(snID)).CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to create zfile: %s", out)
@@ -390,7 +390,7 @@ func generateTargetConfInXML(targetIqn string, configPath string) string {
    initiator-address %s
 </target>
 `
-	return fmt.Sprintf(fmtTargetConf, targetIqn, configPath, tgtBackingStoreOverlayBD, defaultInitiatorAddress)
+	return fmt.Sprintf(fmtTargetConf, targetIqn, configPath, tgtBackingStoreOverlaybd, defaultInitiatorAddress)
 }
 
 // TODO: use device number to check?

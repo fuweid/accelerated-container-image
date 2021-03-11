@@ -32,7 +32,7 @@ const (
 	storageTypeNormal
 
 	// storageTypeLocalBlock means that the unpacked layer data is in
-	// OverlayBD format for iscsi backing store.
+	// overlaybd format for iscsi backing store.
 	storageTypeLocalBlock
 
 	// storageTypeRemoteBlock means that there is no unpacked layer data.
@@ -63,47 +63,47 @@ const (
 	// TODO(fuweid): Is it possible to use it in upstream?
 	labelKeyImageRef = "containerd.io/snapshot/image-ref"
 
-	// labelKeyOverlayBDBlobDigest is the annotation key in the manifest to
-	// describe the digest of blob in OverlayBD format.
+	// labelKeyOverlaybdBlobDigest is the annotation key in the manifest to
+	// describe the digest of blob in overlaybd format.
 	//
 	// NOTE: The annotation is part of image layer blob's descriptor.
-	labelKeyOverlayBDBlobDigest = "containerd.io/snapshot/overlaybd/blob-digest"
+	labelKeyOverlaybdBlobDigest = "containerd.io/snapshot/overlaybd/blob-digest"
 
-	// labelKeyOverlayBDBlobSize is the annotation key in the manifest to
-	// describe the size of blob in OverlayBD format.
+	// labelKeyOverlaybdBlobSize is the annotation key in the manifest to
+	// describe the size of blob in overlaybd format.
 	//
 	// NOTE: The annotation is part of image layer blob's descriptor.
-	labelKeyOverlayBDBlobSize = "containerd.io/snapshot/overlaybd/blob-size"
+	labelKeyOverlaybdBlobSize = "containerd.io/snapshot/overlaybd/blob-size"
 )
 
 // interface
 const (
-	// LabelSupportWritableOverlayBD is used to support writable block device
+	// LabelSupportWritableOverlaybd is used to support writable block device
 	// for active snapshotter.
 	//
 	// By default, multiple active snapshotters can share one block device
 	// from parent snapshotter(committed). Like image builder and
 	// sandboxed-like container runtime(KataContainer, Firecracker), those
 	// cases want to use the block device alone or as writable. The label
-	// LabelSupportWritableOverlayBD is interface to mark the snapshotter
+	// LabelSupportWritableOverlaybd is interface to mark the snapshotter
 	// as wriable block device.
-	LabelSupportWritableOverlayBD = "containerd.io/snapshot/overlaybd.writable"
+	LabelSupportWritableOverlaybd = "containerd.io/snapshot/overlaybd.writable"
 
-	// LabelLocalOverlayBDPath is used to export the commit file path.
+	// LabelLocalOverlaybdPath is used to export the commit file path.
 	//
 	// NOTE: Only used in image build.
-	LabelLocalOverlayBDPath = "containerd.io/snapshot/overlaybd.localcommitpath"
+	LabelLocalOverlaybdPath = "containerd.io/snapshot/overlaybd.localcommitpath"
 )
 
 // SnapshotterConfig is used to configure the snapshotter instance
 type SnapshotterConfig struct {
-	// OverlayBDUtilBinDir contains overlaybd-create/overlaybd-commit tools
+	// OverlaybdUtilBinDir contains overlaybd-create/overlaybd-commit tools
 	// to handle writable device.
-	OverlayBDUtilBinDir string `toml:"overlaybd_util_bin_dir" json:"overlaybd_util_bin_dir"`
+	OverlaybdUtilBinDir string `toml:"overlaybd_util_bin_dir" json:"overlaybd_util_bin_dir"`
 }
 
 var defaultConfig = SnapshotterConfig{
-	OverlayBDUtilBinDir: "/opt/overlaybd/bin",
+	OverlaybdUtilBinDir: "/opt/overlaybd/bin",
 }
 
 // Opt is an option to configure the snapshotter
@@ -120,7 +120,7 @@ type Opt func(config *SnapshotterConfig) error
 //    # overlayFS plugin, which means that it can support normal OCI image.
 //    #
 //    # If the pull job doesn't support `containerd.io/snapshot.ref` and `containerd.io/snapshot/image-ref`,
-//    # the snapshotter will use localBD mode to support the blob data in OverlayBD
+//    # the snapshotter will use localBD mode to support the blob data in overlaybd
 //    # format. The ${ID}/fs will be empty and the real file data will be placed
 //    # in the ${ID}/block/mountpoint. It is the same to the remoteBD mode.
 //    #
@@ -129,9 +129,9 @@ type Opt func(config *SnapshotterConfig) error
 //      |   |_ fs/               # lowerdir or upperdir
 //      |   |_ work/             # workdir
 //      |   |_ block/            # iscsi-target block
-//      |      |_ config.v1.json     # config for OverlayBD backing store in open-iscsi
+//      |      |_ config.v1.json     # config for overlaybd backing store in open-iscsi
 //      |      |_ init-debug.log     # shows the debug log when creating open-iscsi target
-//      |      |_ mountpoint         # the block device will mount on this if the snapshot is based on OverlayBD
+//      |      |_ mountpoint         # the block device will mount on this if the snapshot is based on overlaybd
 //      |      |_ writable_data      # exists if the block is writable in active snapshotter
 //      |      |_ writable_index     # exists if the block is writable in active snapshotter
 //      |
@@ -306,7 +306,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 				return nil, err
 			}
 
-			if err := o.constructOverlayBDSpec(ctx, targetRef, false); err != nil {
+			if err := o.constructOverlaybdSpec(ctx, targetRef, false); err != nil {
 				return nil, err
 			}
 
@@ -330,7 +330,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 	stype := storageTypeNormal
 
 	// if parent is not empty, try to attach and mount block device
-	_, writableBD := info.Labels[LabelSupportWritableOverlayBD]
+	_, writableBD := info.Labels[LabelSupportWritableOverlaybd]
 	if parent != "" {
 		parentID, parentInfo, _, err := storage.GetInfo(ctx, parent)
 		if err != nil {
@@ -348,7 +348,7 @@ func (o *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 			if writableBD {
 				obdID, obdName = id, key
 
-				if err := o.constructOverlayBDSpec(ctx, obdName, writableBD); err != nil {
+				if err := o.constructOverlaybdSpec(ctx, obdName, writableBD); err != nil {
 					return nil, err
 				}
 			}
@@ -415,7 +415,7 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 			return nil, errors.Wrap(err, "failed to get info")
 		}
 
-		_, writableBD := info.Labels[LabelSupportWritableOverlayBD]
+		_, writableBD := info.Labels[LabelSupportWritableOverlaybd]
 		if writableBD {
 			return o.basedOnBlockDeviceMount(s, writableBD), nil
 		}
@@ -460,7 +460,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	}
 
 	// if writable, should commit the data and make it immutable.
-	if _, writableBD := oinfo.Labels[LabelSupportWritableOverlayBD]; writableBD {
+	if _, writableBD := oinfo.Labels[LabelSupportWritableOverlaybd]; writableBD {
 		// TODO(fuweid): how to rollback?
 		if err := o.unmountAndDetachBlockDevice(ctx, id, key); err != nil {
 			return errors.Wrapf(err, "failed to destroy target device for snapshot %s", key)
@@ -476,12 +476,12 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 			}
 
 			// clean up the temporary data
-			os.Remove(o.tgtOverlayBDWritableDataPath(id))
-			os.Remove(o.tgtOverlayBDWritableIndexPath(id))
+			os.Remove(o.tgtOverlaybdWritableDataPath(id))
+			os.Remove(o.tgtOverlaybdWritableIndexPath(id))
 			os.Remove(o.tgtTargetConfPath(id, key))
 		}()
 
-		opts = append(opts, snapshots.WithLabels(map[string]string{LabelLocalOverlayBDPath: o.magicFilePath(id)}))
+		opts = append(opts, snapshots.WithLabels(map[string]string{LabelLocalOverlaybdPath: o.magicFilePath(id)}))
 	}
 
 	id, info, err := o.commit(ctx, name, key, opts...)
@@ -495,7 +495,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	}
 
 	if stype == storageTypeLocalBlock {
-		if err := o.constructOverlayBDSpec(ctx, name, false); err != nil {
+		if err := o.constructOverlaybdSpec(ctx, name, false); err != nil {
 			return errors.Wrapf(err, "failed to construct overlaybd config")
 		}
 
@@ -503,8 +503,8 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 			info.Labels = make(map[string]string)
 		}
 
-		info.Labels[LabelLocalOverlayBDPath] = o.magicFilePath(id)
-		info, err = storage.UpdateInfo(ctx, info, fmt.Sprintf("labels.%s", LabelLocalOverlayBDPath))
+		info.Labels[LabelLocalOverlaybdPath] = o.magicFilePath(id)
+		info, err = storage.UpdateInfo(ctx, info, fmt.Sprintf("labels.%s", LabelLocalOverlaybdPath))
 		if err != nil {
 			return err
 		}
@@ -790,8 +790,8 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 func (o *snapshotter) identifySnapshotStorageType(id string, info snapshots.Info) (storageType, error) {
 	if _, ok := info.Labels[labelKeyTargetSnapshotRef]; ok {
-		_, hasBDBlobSize := info.Labels[labelKeyOverlayBDBlobSize]
-		_, hasBDBlobDigest := info.Labels[labelKeyOverlayBDBlobDigest]
+		_, hasBDBlobSize := info.Labels[labelKeyOverlaybdBlobSize]
+		_, hasBDBlobDigest := info.Labels[labelKeyOverlaybdBlobDigest]
 
 		if hasBDBlobSize && hasBDBlobDigest {
 			if _, ok := info.Labels[labelKeyImageRef]; ok {
@@ -858,19 +858,19 @@ func (o *snapshotter) tgtTargetMountpoint(id string) string {
 	return filepath.Join(o.root, "snapshots", id, "block", "mountpoint")
 }
 
-func (o *snapshotter) tgtOverlayBDConfPath(id string) string {
+func (o *snapshotter) tgtOverlaybdConfPath(id string) string {
 	return filepath.Join(o.root, "snapshots", id, "block", "config.v1.json")
 }
 
-func (o *snapshotter) tgtOverlayBDInitDebuglogPath(id string) string {
+func (o *snapshotter) tgtOverlaybdInitDebuglogPath(id string) string {
 	return filepath.Join(o.root, "snapshots", id, "block", "init-debug.log")
 }
 
-func (o *snapshotter) tgtOverlayBDWritableIndexPath(id string) string {
+func (o *snapshotter) tgtOverlaybdWritableIndexPath(id string) string {
 	return filepath.Join(o.root, "snapshots", id, "block", "writable_index")
 }
 
-func (o *snapshotter) tgtOverlayBDWritableDataPath(id string) string {
+func (o *snapshotter) tgtOverlaybdWritableDataPath(id string) string {
 	return filepath.Join(o.root, "snapshots", id, "block", "writable_data")
 }
 

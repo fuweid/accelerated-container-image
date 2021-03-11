@@ -17,7 +17,7 @@ Go >= 1.15.x is required.
 
 ### Requirements
 
-* OverlayBD proxy snapshotter required containerd daemon >= 1.4.x
+* overlaybd proxy snapshotter required containerd daemon >= 1.4.x
   * Require [supports target snapshot references on prepare](https://github.com/containerd/containerd/pull/3793).
   * See [Downloads at containerd.io](https://containerd.io/downloads/).
 

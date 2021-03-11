@@ -1,19 +1,19 @@
 # Getting Started
 
-Before checkout the examples, make sure that you have build or install the components described in [OverlayBD](https://github.com/alibaba/overlaybd/README.md), [BUILDING](BUILDING.md) and [INSTALL](INSTALL.md).
+Before checkout the examples, make sure that you have build or install the components described in [overlaybd](https://github.com/alibaba/overlaybd/README.md), [BUILDING](BUILDING.md) and [INSTALL](INSTALL.md).
 
 This doc includes:
 
 * [Setup Components](#setup-components)
-  * [OverlayBD](#overlaybd)
-  * [Proxy OverlayBD Snapshotter](#proxy-overlaybd-snapshotter)
+  * [overlaybd](#overlaybd)
+  * [Proxy overlaybd Snapshotter](#proxy-overlaybd-snapshotter)
 * [Ondemand Pulling Image Case](#ondemand-pulling-image-case)
-* [Writable OverlayBD](#writable-overlaybd)
-* [Convert OCI Image into OverlayBD](#convert-oci-image-into-overlaybd)
+* [Writable overlaybd](#writable-overlaybd)
+* [Convert OCI Image into overlaybd](#convert-oci-image-into-overlaybd)
 
 ## Setup Components
 
-### OverlayBD
+### overlaybd
 
 Check the overlaybd backing-store of tgt.
 
@@ -21,11 +21,11 @@ Check the overlaybd backing-store of tgt.
 sudo tgtadm --lld iscsi --mode system --op show | grep -B 5 overlaybd
 ```
 
-If there is no overlaybd backing-store, please checkout [OverlayBD](https://github.com/alibaba/overlaybd).
+If there is no overlaybd backing-store, please checkout [overlaybd](https://github.com/alibaba/overlaybd).
 
-### Proxy OverlayBD Snapshotter
+### Proxy overlaybd Snapshotter
 
-Start the OverlayBD snapshotter.
+Start the overlaybd snapshotter.
 
 ```bash
 # in one terminal
@@ -40,7 +40,7 @@ sudo cat <<-EOF | sudo tee /etc/overlaybd-snapshotter/config.json
 EOF
 
 # run snapshotter
-sudo bin/snapshotter
+sudo bin/overlaybd-snapshotter
 ```
 
 Use `ctr` to check the plugin.
@@ -99,9 +99,9 @@ $ sudo ctr run --net-host --snapshotter=overlaybd --rm -t overlaybd-registry.cn-
 1:M 03 Mar 2021 04:39:31.810 * Ready to accept connections
 ```
 
-## Convert OCI Image into OverlayBD
+## Convert OCI Image into overlaybd
 
-OverlayBD image convertor helps to convert a normal image to OverlayBD-format remote image.
+overlaybd image convertor helps to convert a normal image to overlaybd-format remote image.
 
 ```bash
 # pull the source image
