@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"os/exec"
 	"path"
@@ -175,6 +176,13 @@ func (o *snapshotter) attachAndMountBlockDevice(ctx context.Context, snID string
 		return errors.Wrapf(err, "failed to enable target for %s", targetPath)
 	}
 
+	err = ioutil.WriteFile(
+		path.Join(targetPath, "attrib", "cmd_time_out"),
+		([]byte)(fmt.Sprintf("%v", math.MaxInt32/1000)), 0666)
+	if err != nil {
+		return errors.Wrapf(err, "failed to update cmd_time_out")
+	}
+
 	loopDevID := o.overlaybdLoopbackDeviceID(snID)
 	loopDevPath := o.overlaybdLoopbackDevicePath(loopDevID)
 
@@ -284,6 +292,13 @@ func (o *snapshotter) attachAndMountBlockDevice(ctx context.Context, snID string
 							lastErr = errors.Wrapf(err, "failed to mount %s to %s", device, mountPoint)
 							time.Sleep(10 * time.Millisecond)
 							break // retry
+						}
+
+						err = ioutil.WriteFile(
+							path.Join("/sys/block", dev.Name(), "device", "timeout"),
+							([]byte)(fmt.Sprintf("%v", math.MaxInt32/1000)), 0666)
+						if err != nil {
+							return errors.Wrapf(err, "failed to update timeout")
 						}
 					} else {
 						args := []string{"-t", fstype}
